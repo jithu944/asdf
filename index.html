@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Africa Map Quiz</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0b1622;
+    --surface: #131f2e;
+    --surface2: #1a2d42;
+    --gold: #f5c842;
+    --gold-dim: #b8922a;
+    --green: #22c55e;
+    --red: #ef4444;
+    --blue: #3b82f6;
+    --text: #e8f0f8;
+    --muted: #6b8aaa;
+    --border: #1e3250;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px;
+    overflow-x: hidden;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 14px;
+  }
+
+  header h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(22px, 4vw, 36px);
+    font-weight: 800;
+    color: var(--gold);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    line-height: 1;
+  }
+
+  header p {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 4px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+
+  .hud {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 18px;
+    text-align: center;
+    min-width: 72px;
+  }
+
+  .stat-val {
+    font-family: 'Syne', sans-serif;
+    font-size: 24px;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  .stat-label {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 2px;
+  }
+
+  #question-box {
+    background: var(--surface);
+    border: 1.5px solid var(--gold-dim);
+    border-radius: 14px;
+    padding: 10px 24px 12px;
+    text-align: center;
+    margin-bottom: 10px;
+    min-width: 280px;
+    max-width: 600px;
+    width: 100%;
+    position: relative;
+  }
+
+  #question-box .eyebrow {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 2px;
+  }
+
+  #country-name {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(20px, 3vw, 30px);
+    font-weight: 800;
+    color: var(--gold);
+    letter-spacing: 1px;
+  }
+
+  #map-wrap {
+    width: 100%;
+    max-width: 680px;
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  #map-wrap svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    cursor: crosshair;
+  }
+
+  .country {
+    fill: #1e3a5a;
+    stroke: #0b1622;
+    stroke-width: 0.5;
+    transition: fill 0.12s;
+    cursor: pointer;
+  }
+
+  .country:hover {
+    fill: #2e5a8a;
+  }
+
+  .country.correct {
+    fill: #15803d;
+    stroke: #22c55e;
+    stroke-width: 1;
+  }
+
+  .country.wrong-flash {
+    fill: #b91c1c;
+    stroke: #ef4444;
+    stroke-width: 1;
+  }
+
+  .country.done {
+    fill: #0d4025;
+    opacity: 0.75;
+    cursor: default;
+  }
+
+  .country.done:hover {
+    fill: #0d4025;
+  }
+
+  #tooltip {
+    position: absolute;
+    background: #0b1622ee;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 5px 12px;
+    font-size: 13px;
+    color: var(--text);
+    pointer-events: none;
+    display: none;
+    white-space: nowrap;
+    z-index: 20;
+    font-family: 'DM Sans', sans-serif;
+    max-width: 200px;
+  }
+
+  #feedback {
+    text-align: center;
+    height: 26px;
+    font-size: 15px;
+    font-weight: 500;
+    margin-top: 8px;
+    letter-spacing: 0.3px;
+    transition: opacity 0.2s;
+  }
+
+  .fb-correct { color: var(--green); }
+  .fb-wrong   { color: var(--red); }
+
+  #progress-bar {
+    width: 100%;
+    max-width: 680px;
+    height: 5px;
+    background: var(--surface2);
+    border-radius: 3px;
+    margin-top: 10px;
+    overflow: hidden;
+  }
+
+  #progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--gold), #f08040);
+    border-radius: 3px;
+    transition: width 0.5s ease;
+    width: 0%;
+  }
+
+  #end-screen {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    padding: 20px;
+    text-align: center;
+  }
+
+  #end-screen h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 36px;
+    font-weight: 800;
+    color: var(--gold);
+  }
+
+  #end-screen p { color: var(--muted); font-size: 16px; }
+
+  #restart-btn {
+    background: var(--gold);
+    color: #0b1622;
+    border: none;
+    border-radius: 10px;
+    padding: 12px 36px;
+    font-family: 'Syne', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: background 0.15s, transform 0.1s;
+  }
+
+  #restart-btn:hover { background: #f8d060; transform: scale(1.03); }
+
+  #loading {
+    color: var(--muted);
+    font-size: 14px;
+    margin: 40px 0;
+    text-align: center;
+  }
+
+  .ocean { fill: #0d1e30; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🌍 Africa Quiz</h1>
+  <p>Click the correct country on the map</p>
+</header>
+
+<div class="hud">
+  <div class="stat"><div class="stat-val" id="s-correct" style="color:var(--green)">0</div><div class="stat-label">Correct</div></div>
+  <div class="stat"><div class="stat-val" id="s-wrong" style="color:var(--red)">0</div><div class="stat-label">Wrong</div></div>
+  <div class="stat"><div class="stat-val" id="s-score" style="color:var(--gold)">0</div><div class="stat-label">Score</div></div>
+  <div class="stat"><div class="stat-val" id="s-left" style="color:#aabbcc">—</div><div class="stat-label">Left</div></div>
+</div>
+
+<div id="question-box">
+  <div class="eyebrow">Find this country</div>
+  <div id="country-name">Loading map…</div>
+</div>
+
+<div id="map-wrap">
+  <div id="tooltip"></div>
+  <div id="loading">Loading real geographic data…</div>
+</div>
+
+<div id="feedback"></div>
+<div id="progress-bar"><div id="progress-fill"></div></div>
+
+<div id="end-screen">
+  <h2>Quiz Complete! 🎉</h2>
+  <p id="final-text"></p>
+  <button id="restart-btn" onclick="startGame()">Play Again</button>
+</div>
+
+<script>
+const AFRICAN_ISO = new Set([
+  "DZA","AGO","BEN","BWA","BFA","BDI","CMR","CPV","CAF","TCD",
+  "COM","COD","COG","CIV","DJI","EGY","GNQ","ERI","SWZ","ETH",
+  "GAB","GMB","GHA","GIN","GNB","KEN","LSO","LBR","LBY","MDG",
+  "MWI","MLI","MRT","MUS","MAR","MOZ","NAM","NER","NGA","RWA",
+  "STP","SEN","SYC","SLE","SOM","ZAF","SSD","SDN","TZA","TGO",
+  "TUN","UGA","ESH","ZMB","ZWE"
+]);
+
+const COUNTRY_NAMES = {
+  "DZA":"Algeria","AGO":"Angola","BEN":"Benin","BWA":"Botswana","BFA":"Burkina Faso",
+  "BDI":"Burundi","CMR":"Cameroon","CPV":"Cape Verde","CAF":"Central African Republic",
+  "TCD":"Chad","COM":"Comoros","COD":"Dem. Rep. Congo","COG":"Republic of the Congo",
+  "CIV":"Ivory Coast","DJI":"Djibouti","EGY":"Egypt","GNQ":"Equatorial Guinea",
+  "ERI":"Eritrea","SWZ":"Eswatini","ETH":"Ethiopia","GAB":"Gabon","GMB":"The Gambia",
+  "GHA":"Ghana","GIN":"Guinea","GNB":"Guinea-Bissau","KEN":"Kenya","LSO":"Lesotho",
+  "LBR":"Liberia","LBY":"Libya","MDG":"Madagascar","MWI":"Malawi","MLI":"Mali",
+  "MRT":"Mauritania","MUS":"Mauritius","MAR":"Morocco","MOZ":"Mozambique","NAM":"Namibia",
+  "NER":"Niger","NGA":"Nigeria","RWA":"Rwanda","STP":"São Tomé & Príncipe",
+  "SEN":"Senegal","SYC":"Seychelles","SLE":"Sierra Leone","SOM":"Somalia",
+  "ZAF":"South Africa","SSD":"South Sudan","SDN":"Sudan","TZA":"Tanzania",
+  "TGO":"Togo","TUN":"Tunisia","UGA":"Uganda","ESH":"Western Sahara",
+  "ZMB":"Zambia","ZWE":"Zimbabwe"
+};
+
+let geojson = null;
+let queue = [], correct = 0, wrong = 0, score = 0;
+let current = null, guessing = false;
+let projection, pathGen, svgEl, gEl;
+
+async function loadMap() {
+  const url = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
+  const topo = await fetch(url).then(r => r.json());
+  const { feature } = await import("https://cdn.jsdelivr.net/npm/topojson-client@3/+esm");
+  const world = feature(topo, topo.objects.countries);
+  geojson = {
+    type: "FeatureCollection",
+    features: world.features.filter(f => {
+      const iso = numericToISO(f.id);
+      return iso && AFRICAN_ISO.has(iso);
+    })
+  };
+  document.getElementById('loading').remove();
+  drawMap();
+  startGame();
+}
+
+function numericToISO(id) {
+  const map = {
+    "012":"DZA","024":"AGO","204":"BEN","072":"BWA","854":"BFA","108":"BDI",
+    "120":"CMR","132":"CPV","140":"CAF","148":"TCD","174":"COM","180":"COD",
+    "178":"COG","384":"CIV","262":"DJI","818":"EGY","226":"GNQ","232":"ERI",
+    "748":"SWZ","231":"ETH","266":"GAB","270":"GMB","288":"GHA","324":"GIN",
+    "624":"GNB","404":"KEN","426":"LSO","430":"LBR","434":"LBY","450":"MDG",
+    "454":"MWI","466":"MLI","478":"MRT","480":"MUS","504":"MAR","508":"MOZ",
+    "516":"NAM","562":"NER","566":"NGA","646":"RWA","678":"STP","686":"SEN",
+    "690":"SYC","694":"SLE","706":"SOM","710":"ZAF","728":"SSD","729":"SDN",
+    "834":"TZA","768":"TGO","788":"TUN","800":"UGA","732":"ESH","894":"ZMB","716":"ZWE"
+  };
+  return map[String(id).padStart(3,'0')];
+}
+
+function drawMap() {
+  const wrap = document.getElementById('map-wrap');
+  const W = 680, H = 720;
+
+  projection = d3.geoMercator()
+    .fitSize([W, H], geojson)
+    .clipExtent([[0,0],[W,H]]);
+
+  pathGen = d3.geoPath().projection(projection);
+
+  svgEl = d3.select('#map-wrap').append('svg')
+    .attr('viewBox', `0 0 ${W} ${H}`)
+    .attr('width', W)
+    .attr('height', H);
+
+  svgEl.append('rect').attr('width', W).attr('height', H).attr('class','ocean');
+
+  gEl = svgEl.append('g');
+
+  gEl.selectAll('.country')
+    .data(geojson.features)
+    .enter().append('path')
+    .attr('class','country')
+    .attr('d', pathGen)
+    .attr('data-iso', d => numericToISO(d.id))
+    .on('click', function(event, d) {
+      const iso = numericToISO(d.id);
+      onClick(iso, event);
+    })
+    .on('mousemove', function(event, d) {
+      const iso = numericToISO(d.id);
+      const name = COUNTRY_NAMES[iso] || iso;
+      const [mx, my] = d3.pointer(event, wrap);
+      const tt = document.getElementById('tooltip');
+      tt.textContent = name;
+      tt.style.display = 'block';
+      tt.style.left = (mx + 14) + 'px';
+      tt.style.top = (my - 32) + 'px';
+    })
+    .on('mouseleave', function() {
+      document.getElementById('tooltip').style.display = 'none';
+    });
+}
+
+function shuffle(arr) {
+  const a = [...arr];
+  for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}
+  return a;
+}
+
+function startGame() {
+  correct = 0; wrong = 0; score = 0;
+  queue = shuffle(Object.keys(COUNTRY_NAMES));
+  current = null; guessing = false;
+  document.getElementById('end-screen').style.display = 'none';
+  document.getElementById('question-box').style.display = 'block';
+  document.getElementById('progress-bar').style.display = 'block';
+  document.getElementById('feedback').textContent = '';
+  if(gEl) {
+    gEl.selectAll('.country')
+      .classed('correct',false).classed('done',false).classed('wrong-flash',false);
+  }
+  updateHUD();
+  nextQuestion();
+}
+
+function nextQuestion() {
+  if(queue.length === 0) { endGame(); return; }
+  current = queue.shift();
+  guessing = true;
+  document.getElementById('country-name').textContent = COUNTRY_NAMES[current] || current;
+  document.getElementById('feedback').textContent = '';
+  document.getElementById('feedback').className = '';
+  updateHUD();
+  updateProgress();
+}
+
+function updateHUD() {
+  document.getElementById('s-correct').textContent = correct;
+  document.getElementById('s-wrong').textContent = wrong;
+  document.getElementById('s-score').textContent = score;
+  document.getElementById('s-left').textContent = queue.length + (current ? 1 : 0);
+}
+
+function updateProgress() {
+  const total = Object.keys(COUNTRY_NAMES).length;
+  const done = total - queue.length - (current ? 1 : 0);
+  document.getElementById('progress-fill').style.width = Math.round((done/total)*100) + '%';
+}
+
+function getPath(iso) {
+  return gEl ? gEl.selectAll('.country').filter(d => numericToISO(d.id) === iso) : null;
+}
+
+function onClick(iso, event) {
+  if(!guessing || !current) return;
+  if(!AFRICAN_ISO.has(iso)) return;
+
+  const fb = document.getElementById('feedback');
+
+  if(iso === current) {
+    correct++; score += 10; guessing = false;
+    fb.textContent = '✓ Correct! +10'; fb.className = 'fb-correct';
+    const p = getPath(iso);
+    if(p) p.classed('correct', true);
+    updateHUD();
+    setTimeout(() => {
+      if(p) { p.classed('correct', false); p.classed('done', true); }
+      nextQuestion();
+    }, 750);
+  } else {
+    wrong++; score = Math.max(0, score - 3);
+    fb.textContent = `✗ That's ${COUNTRY_NAMES[iso] || iso} — try again! −3`; fb.className = 'fb-wrong';
+    const p = getPath(iso);
+    if(p) {
+      p.classed('wrong-flash', true);
+      setTimeout(() => p.classed('wrong-flash', false), 600);
+    }
+    updateHUD();
+  }
+}
+
+function endGame() {
+  current = null; guessing = false;
+  document.getElementById('question-box').style.display = 'none';
+  document.getElementById('progress-bar').style.display = 'none';
+  document.getElementById('feedback').textContent = '';
+  const total = Object.keys(COUNTRY_NAMES).length;
+  const pct = Math.round((correct/total)*100);
+  document.getElementById('final-text').textContent =
+    `${correct} of ${total} correct (${pct}%) — Final score: ${score}`;
+  document.getElementById('end-screen').style.display = 'flex';
+}
+
+loadMap().catch(err => {
+  document.getElementById('loading').textContent = 'Failed to load map. Please reload.';
+  console.error(err);
+});
+</script>
+</body>
+</html> 
